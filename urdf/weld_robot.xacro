@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="weld_robot_ur5e">
+
+  <xacro:arg name="ur_type" default="ur5e" />
+  <xacro:include filename="$(find ur_description)/urdf/ur.urdf.xacro" />
+
+  <xacro:include filename="$(find weld_desc)/urdf/weld_torch.xacro" />
+
+  <xacro:weld_torch prefix="weld_" parent="tool0" />
+
+</robot>

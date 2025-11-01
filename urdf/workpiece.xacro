@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="workpiece">
+
+  <!-- Properties for each plate -->
+  <xacro:property name="plate_length" value="0.5" /> <!-- 50 cm (X direction) -->
+  <xacro:property name="plate_width" value="0.25" /> <!-- 25 cm (Y direction) -->
+  <xacro:property name="plate_height" value="0.01" /> <!-- 1 cm thick (Z direction) -->
+
+  <!-- Base link (to fix the plates to the world) -->
+  <link name="world"/>
+
+  <!-- ================= PLATE 1 (Left Side) ================= -->
+  <link name="plate1_link">
+    <visual>
+      <geometry>
+        <box size="${plate_length} ${plate_width} ${plate_height}"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.5 0.5 0.5 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${plate_length} ${plate_width} ${plate_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <!-- Joint to fix Plate 1 to the world -->
+  <!-- Position: X=0.7m (in front), Y=0.126m (left), Z=0.5m (up) -->
+  <!-- We leave a 1mm gap from the center, so 0.125 (half_width) + 0.001 (gap) = 0.126 -->
+  <joint name="plate1_joint" type="fixed">
+    <parent link="world"/>
+    <child link="plate1_link"/>
+    <origin xyz="0.7 0.126 0.5" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ================= PLATE 2 (Right Side) ================= -->
+  <link name="plate2_link">
+    <visual>
+      <geometry>
+        <box size="${plate_length} ${plate_width} ${plate_height}"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${plate_length} ${plate_width} ${plate_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <!-- Joint to fix Plate 2 to the world -->
+  <!-- Position: X=0.7m (in front), Y=-0.126m (right), Z=0.5m (up) -->
+  <joint name="plate2_joint" type="fixed">
+    <parent link="world"/>
+    <child link="plate2_link"/>
+    <origin xyz="0.7 -0.126 0.5" rpy="0 0 0"/>
+  </joint>
+
+</robot>
