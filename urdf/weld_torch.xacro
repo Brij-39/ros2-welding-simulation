@@ -1,55 +1,63 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="weld_torch" params="prefix parent">
     
-    <xacro:macro name="weld_torch" params="prefix parent">
+    <link name="${prefix}torch_base">
+      <visual>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+        <geometry><cylinder length="0.1" radius="0.02"/></geometry>
+        <material name="Grey"><color rgba="0.5 0.5 0.5 1.0"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+        <geometry><cylinder length="0.1" radius="0.02"/></geometry>
+      </collision>
+    </link>
 
-        <link name="${prefix}torch_base">
-            <visual>
-                <origin xyz="0 0 0.05" rpy="0 0 0"/>
-                <geometry>
-                    <cylinder length="0.1" radius="0.02"/>
-                </geometry>
-                <material name="Grey">
-                    <color rgba="0.5 0.5 0.5 1.0"/>
-                </material>
-            </visual>
-            <collision>
-                <origin xyz="0 0 0.05" rpy="0 0 0"/>
-                <geometry>
-                    <cylinder length="0.1" radius="0.02"/>
-                </geometry>
-            </collision>
-        </link>
+    <link name="${prefix}torch_tip">
+      <visual>
+        <origin xyz="0 0 0.025" rpy="0 0 0"/>
+        <geometry><cylinder length="0.05" radius="0.005"/></geometry>
+        <material name="Copper"><color rgba="0.8 0.5 0.2 1.0"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.025" rpy="0 0 0"/>
+        <geometry><cylinder length="0.05" radius="0.0015"/></geometry>
+      </collision>
+    </link>
 
-        <link name="${prefix}torch_tip">
-            <visual>
-                <origin xyz="0 0 0.025" rpy="0 0 0"/>
-                <geometry>
-                    <cylinder length="0.05" radius="0.005"/>
-                </geometry>
-                <material name="Copper">
-                    <color rgba="0.8 0.5 0.2 1.0"/>
-                </material>
-            </visual>
-            <collision>
-                <origin xyz="0 0 0.025" rpy="0 0 0"/>
-                <geometry>
-                    <cylinder length="0.05" radius="0.005"/>
-                </geometry>
-            </collision>
-        </link>
+    <joint name="${prefix}base_to_tip_joint" type="fixed">
+      <parent link="${prefix}torch_base"/>
+      <child link="${prefix}torch_tip"/>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    </joint>
 
-        <joint name="${prefix}base_to_tip_joint" type="fixed">
-            <parent link="${prefix}torch_base"/>
-            <child link="${prefix}torch_tip"/>
-            <origin xyz="0 0 0.1" rpy="0 0 0"/>
-        </joint>
+    <joint name="${prefix}torch_to_robot_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}torch_base"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
 
-        <joint name="${prefix}torch_to_robot_joint" type="fixed">
-            <parent link="${parent}"/>
-            <child link="${prefix}torch_base"/>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-        </joint>
+    <gazebo reference="${prefix}torch_tip">
+      <visual>
+        <material>
+          <ambient>0.0 0.8 1.0 1.0</ambient>
+          <emissive>0.0 0.8 1.0 1.0</emissive>
+        </material>
+      </visual>
+      
+      <light name="${prefix}arc_light" type="point">
+        <pose>0 0 -0.01 0 0 0</pose> <diffuse>0.1 0.1 1.0 1.0</diffuse> 
+        <specular>0.8 0.8 0.8 1.0</specular>
+        
+        <attenuation>
+          <range>0.20</range>      <linear>2.0</linear>    <constant>0.1</constant>
+          <quadratic>2.0</quadratic>
+        </attenuation>
+        
+        <cast_shadows>false</cast_shadows>
+      </light>
+    </gazebo>
 
-    </xacro:macro>
+  </xacro:macro>
 </robot>

@@ -7,6 +7,9 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(moveit_ros_planning_interface REQUIRED)
+find_package(geometry_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -44,6 +47,19 @@ install(
 # Install our python scripts
 install(PROGRAMS
   scripts/scene_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(move_robot_cpp src/move_robot.cpp)
+
+ament_target_dependencies(move_robot_cpp
+  rclcpp
+  moveit_ros_planning_interface
+  geometry_msgs
+)
+
+install(TARGETS
+  move_robot_cpp
   DESTINATION lib/${PROJECT_NAME}
 )
 

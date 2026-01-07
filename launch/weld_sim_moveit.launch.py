@@ -30,10 +30,10 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.actions import Node
 
 def launch_setup(context, *args, **kwargs):
 
@@ -91,10 +91,21 @@ def launch_setup(context, *args, **kwargs):
 
 
 
+    # C++ Motion Node ---
+    run_move_robot_cpp = Node(
+    package="weld_desc",
+    executable="move_robot_cpp",
+    output="screen",
+    # Start this node 5 seconds later, so move_group can initialize first
+    prefix="bash -c 'sleep 5.0; $0 $@' ",
+    )
+
+
 
     nodes_to_launch = [
         ur_moveit_launch,
         spawn_scene_node,
+        run_move_robot_cpp,
     ]
 
     return nodes_to_launch

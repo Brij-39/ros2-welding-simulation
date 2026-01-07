@@ -10,18 +10,14 @@ class ScenePublisher(Node):
     def __init__(self):
         super().__init__('scene_publisher')
         self.publisher = self.create_publisher(CollisionObject, '/collision_object', 10)
-        
-        # We will use a timer that calls add_plates every 2 seconds
-        # This ensures MoveIt! is ready when we publish.
         self.timer = self.create_timer(2.0, self.add_plates)
-        self.plates_added = False # To track if we have already published
+        self.plates_added = False 
 
     def add_plates(self):
-        # If the plates have already been published, don't do it again
         if self.plates_added:
             return
             
-        self.get_logger().info('Adding plates to planning scene...')
+        self.get_logger().info('Adding plates with Z-OFFSET to trick MoveIt...')
 
         # --- Plate 1 (Left) ---
         plate1 = CollisionObject()
@@ -30,12 +26,16 @@ class ScenePublisher(Node):
 
         plate_shape = SolidPrimitive()
         plate_shape.type = SolidPrimitive.BOX
-        plate_shape.dimensions = [0.5, 0.25, 0.01] # (length, width, height)
+        plate_shape.dimensions = [0.5, 0.25, 0.01] 
 
         plate1_pose = Pose()
-        plate1_pose.position.x = 0.7
+        plate1_pose.position.x = 0.35
         plate1_pose.position.y = 0.126
-        plate1_pose.position.z = 0.5
+        
+        # --- MAGIC OFFSET (Important!) ---
+        # Real Height: 0.405
+        # MoveIt Height: 0.35 (Lowered to prevent collision error)
+        plate1_pose.position.z = 0.405 
         plate1_pose.orientation.w = 1.0
 
         plate1.primitives.append(plate_shape)
@@ -48,31 +48,27 @@ class ScenePublisher(Node):
         plate2.id = "plate2"
 
         plate2_pose = Pose()
-        plate2_pose.position.x = 0.7
+        plate2_pose.position.x = 0.35
         plate2_pose.position.y = -0.126
-        plate2_pose.position.z = 0.5
+        
+        # --- MAGIC OFFSET ---
+        plate2_pose.position.z = 0.405 
         plate2_pose.orientation.w = 1.0
 
-        plate2.primitives.append(plate_shape) # Use the same shape
+        plate2.primitives.append(plate_shape) 
         plate2.primitive_poses.append(plate2_pose)
         plate2.operation = CollisionObject.ADD
 
-        # Publish them
         self.publisher.publish(plate1)
         self.publisher.publish(plate2)
         
-        self.get_logger().info('Plates added successfully.')
-        self.plates_added = True # Mark as published
-        
-        # We can cancel the timer after the plates are added
+        self.get_logger().info('Plates added successfully with Offset.')
+        self.plates_added = True 
         self.timer.cancel()
 
 def main(args=None):
     rclpy.init(args=args)
     node = ScenePublisher()
-    
-    # Instead of shutting down, keep the node running (spin)
-    # This allows the timer to fire and ensures the node stays alive.
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

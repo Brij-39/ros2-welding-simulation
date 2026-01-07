@@ -5,6 +5,9 @@
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <depend>ur_description</depend>
+  <depend>rclcpp</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>geometry_msgs</depend>
   <maintainer email="brij@todo.todo">brij</maintainer>
   <license>TODO: License declaration</license>
 

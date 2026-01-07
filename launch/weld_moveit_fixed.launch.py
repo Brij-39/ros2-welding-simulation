@@ -156,7 +156,7 @@ def launch_setup(context, *args, **kwargs):
     }
 
     robot_description_kinematics = PathJoinSubstitution(
-        [FindPackageShare("ur_moveit_config"), "config", "kinematics.yaml"]
+        [FindPackageShare("weld_desc"), "config", "ur5e", "my_kinematics.yaml"]
     )
 
     robot_description_planning = {
@@ -266,6 +266,7 @@ def launch_setup(context, *args, **kwargs):
             servo_params,
             robot_description,
             robot_description_semantic,
+            robot_description_kinematics,
         ],
         output="screen",
     )
