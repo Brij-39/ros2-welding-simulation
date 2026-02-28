@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot name="crack_block">
+
+  <link name="world"/>
+
+  <joint name="world_joint" type="fixed">
+    <parent link="world"/>
+    <child link="crack_link"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <link name="crack_link">
+    
+    <inertial>
+      <origin xyz="0.0375 0.0375 -0.005" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/brij/ros2_ws/src/weld_desc/meshes/gazebo_cracked_workpiece.stl" scale="0.004 0.004 0.004"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.0375 0.0375 -0.005" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.075 0.075 0.010"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="crack_link">
+    <material>Gazebo/Red</material>
+  </gazebo>
+
+</robot>

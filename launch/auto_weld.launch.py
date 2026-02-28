@@ -7,17 +7,10 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    declared_arguments = [
-        DeclareLaunchArgument("ur_type", default_value="ur5e", description="Robot Type")
-    ]
-    ur_type = LaunchConfiguration("ur_type")
-    
-    # --- DEFINE KINEMATICS PATH ---
-    robot_description_kinematics = PathJoinSubstitution(
-        [FindPackageShare("weld_desc"), "config", "ur5e", "my_kinematics.yaml"]
-    )
+    # 1. Robot Type Argument
+    ur_type = LaunchConfiguration("ur_type", default="ur5e")
 
-    # 1. Gazebo & Robot (Sim Control)
+    # 2. Gazebo & Robot Simulation (Base control)
     sim_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("weld_desc"), "/launch", "/weld_sim_control.launch.py"]
@@ -25,7 +18,7 @@ def generate_launch_description():
         launch_arguments={"ur_type": ur_type, "launch_rviz": "false", "gui": "true"}.items(),
     )
 
-    # 2. MoveIt (Planning Context)
+    # 3. MoveIt & RViz (Brain & Visualization)
     moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("weld_desc"), "/launch", "/weld_moveit_fixed.launch.py"]
@@ -41,19 +34,26 @@ def generate_launch_description():
         }.items(),
     )
 
-    # 3. Scene Objects (Plates)
-    scene_pub = Node(
-        package="weld_desc", executable="scene_publisher.py", output="screen"
-    )
-
-    # 4. Run C++ Motion Node (Delayed 10s)
-    # FIX: Added 'parameters=[robot_description_kinematics]'
-    move_robot_node = Node(
-        package="weld_desc", 
-        executable="move_robot_cpp", 
+    # 4. NEW: Spawn the Cracked Workpiece automatically in front of Robot
+    # X=0.5 means 50cm in front, Z=0.1 means slightly above ground
+    spawn_crack_block = Node(
+        package="gazebo_ros",
+        executable="spawn_entity.py",
+        name="spawn_crack_block",
+        arguments=[
+            "-entity", "crack_block",
+            "-file", PathJoinSubstitution([FindPackageShare("weld_desc"), "urdf", "cracked_workpiece.urdf"]),
+            "-x", "0.5", "-y", "0.0", "-z", "0.1"
+        ],
         output="screen",
-        parameters=[robot_description_kinematics] 
     )
-    delayed_move = TimerAction(period=10.0, actions=[move_robot_node])
 
-    return LaunchDescription(declared_arguments + [sim_control_launch, moveit_launch, scene_pub, delayed_move])
+    # We delay the block spawning by 5 seconds so Gazebo has time to load the robot first
+    delayed_spawn = TimerAction(period=5.0, actions=[spawn_crack_block])
+
+    return LaunchDescription([
+        DeclareLaunchArgument("ur_type", default_value="ur5e", description="Robot Type"),
+        sim_control_launch,
+        moveit_launch,
+        delayed_spawn
+    ])

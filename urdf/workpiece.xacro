@@ -1,11 +1,13 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="workpiece">
 
+
   <xacro:property name="plate_length" value="0.5" />
   <xacro:property name="plate_width" value="0.25" />
   <xacro:property name="plate_height" value="0.01" />
-
+ 
   <link name="world"/>
+
 
   <link name="plate1_link">
     <visual>
@@ -27,15 +29,18 @@
     </inertial>
   </link>
 
+
   <gazebo reference="plate1_link">
     <material>Gazebo/DarkGrey</material>
   </gazebo>
+
 
   <joint name="plate1_joint" type="fixed">
     <parent link="world" />
     <child link="plate1_link" />
     <origin xyz="0.35 0.126 0.405" rpy="0 0 0"/>
   </joint>
+
 
   <link name="plate2_link">
     <visual>
@@ -57,9 +62,11 @@
     </inertial>
   </link>
 
+
   <gazebo reference="plate2_link">
     <material>Gazebo/DarkGrey</material>
   </gazebo>
+
 
   <joint name="plate2_joint" type="fixed">
     <parent link="world" />

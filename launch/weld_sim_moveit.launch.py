@@ -104,8 +104,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes_to_launch = [
         ur_moveit_launch,
-        spawn_scene_node,
-        run_move_robot_cpp,
+        #spawn_scene_node,
+        #run_move_robot_cpp,
     ]
 
     return nodes_to_launch

@@ -26,16 +26,49 @@
       </collision>
     </link>
 
+    <link name="${prefix}tcp"/>
+
+    <link name="${prefix}sensor_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.02 0.04 0.02"/></geometry>
+        <material name="Black"><color rgba="0.1 0.1 0.1 1.0"/></material>
+      </visual>
+      <collision>
+        <geometry><box size="0.02 0.04 0.02"/></geometry>
+      </collision>
+    </link>
+
+    <link name="${prefix}camera_optical_frame"/>
+
+    <joint name="${prefix}torch_to_robot_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}torch_base"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
     <joint name="${prefix}base_to_tip_joint" type="fixed">
       <parent link="${prefix}torch_base"/>
       <child link="${prefix}torch_tip"/>
       <origin xyz="0 0 0.1" rpy="0 0 0"/>
     </joint>
 
-    <joint name="${prefix}torch_to_robot_joint" type="fixed">
-      <parent link="${parent}"/>
-      <child link="${prefix}torch_base"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+    <joint name="${prefix}tip_to_tcp_joint" type="fixed">
+      <parent link="${prefix}torch_tip"/>
+      <child link="${prefix}tcp"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="${prefix}torch_to_sensor_joint" type="fixed">
+      <parent link="${prefix}torch_base"/>
+      <child link="${prefix}sensor_link"/>
+      <origin xyz="0.04 0 0.06" rpy="0 -1.5708 0"/>
+    </joint>
+
+    <joint name="${prefix}sensor_to_optical_joint" type="fixed">
+      <parent link="${prefix}sensor_link"/>
+      <child link="${prefix}camera_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
     </joint>
 
     <gazebo reference="${prefix}torch_tip">
@@ -45,18 +78,49 @@
           <emissive>0.0 0.8 1.0 1.0</emissive>
         </material>
       </visual>
-      
       <light name="${prefix}arc_light" type="point">
-        <pose>0 0 -0.01 0 0 0</pose> <diffuse>0.1 0.1 1.0 1.0</diffuse> 
+        <pose>0 0 -0.01 0 0 0</pose> 
+        <diffuse>0.1 0.1 1.0 1.0</diffuse> 
         <specular>0.8 0.8 0.8 1.0</specular>
-        
         <attenuation>
-          <range>0.20</range>      <linear>2.0</linear>    <constant>0.1</constant>
+          <range>0.20</range> <linear>2.0</linear> <constant>0.1</constant>
           <quadratic>2.0</quadratic>
         </attenuation>
-        
         <cast_shadows>false</cast_shadows>
       </light>
+    </gazebo>
+
+    <gazebo reference="${prefix}sensor_link">
+      <sensor type="depth" name="${prefix}laser_profiler">
+        <always_on>true</always_on>
+        <update_rate>30.0</update_rate> 
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov> 
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.01</near>
+            <far>1.0</far>
+          </clip>
+        </camera>
+        <plugin name="${prefix}profiler_plugin" filename="libgazebo_ros_camera.so">
+          <ros>
+            <namespace>weld_sensor</namespace>
+            <remapping>custom_camera/image_raw:=image_raw</remapping>
+            <remapping>custom_camera/image_depth:=depth/image_raw</remapping>
+            <remapping>custom_camera/camera_info:=camera_info</remapping>
+            <remapping>custom_camera/camera_info_depth:=depth/camera_info</remapping>
+            <remapping>custom_camera/points:=depth/points</remapping>
+          </ros>
+          <camera_name>laser_profiler</camera_name>
+          <frame_name>${prefix}camera_optical_frame</frame_name>
+          <min_depth>0.01</min_depth>
+          <max_depth>1.0</max_depth>
+        </plugin>
+      </sensor>
     </gazebo>
 
   </xacro:macro>
