@@ -54,6 +54,6 @@ def generate_launch_description():
         output="screen",
         parameters=[robot_description_kinematics] 
     )
-    delayed_move = TimerAction(period=10.0, actions=[move_robot_node])
+    delayed_move = TimerAction(period=20.0, actions=[move_robot_node])
 
     return LaunchDescription(declared_arguments + [sim_control_launch, moveit_launch, scene_pub, delayed_move])

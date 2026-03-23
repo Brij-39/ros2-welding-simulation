@@ -6,14 +6,14 @@
 #include <vector>
 
 // --- VERIFIED MATHEMATICAL CONSTANTS ---
-// Pitch angle of 15 degrees (0.2618 rad) prevents UR5e wrist singularity
+
 const double WELD_PITCH = 0.2618; 
-// Z = Plate Surface (0.41) + Standoff (0.01)
+
 const double WELD_Z = 0.57;
-// X Start = Plate Min (0.35) + Margin (0.01)
+
 const double WELD_X_START = 0.11;
-// X End = Plate Max (0.85) - Margin (0.01)
-const double WELD_X_END = 0.70;
+
+const double WELD_X_END = 0.50;
 // Y Center = 0.0 (Gap between plates)
 const double WELD_Y = 0.0;
 
