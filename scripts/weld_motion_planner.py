@@ -5,6 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseArray
 from moveit_msgs.srv import GetCartesianPath
 from trajectory_msgs.msg import JointTrajectory
+from sensor_msgs.msg import JointState
 
 class WeldMotionPlanner(Node):
     def __init__(self):
@@ -28,8 +29,20 @@ class WeldMotionPlanner(Node):
         # 3. MoveIt 2 Cartesian Path Service: सीधी लाइन का रास्ता बनाने के लिए
         self.cartesian_client = self.create_client(GetCartesianPath, '/compute_cartesian_path')
         
+        # 4. Subscriber for current joint states
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_state_callback,
+            10
+        )
+        
+        self.current_joint_state = None
         self.is_moving = False
         self.get_logger().info('🤖 Weld Motion Planner Ready! Waiting for Crack Path...')
+
+    def joint_state_callback(self, msg):
+        self.current_joint_state = msg
 
     def path_callback(self, msg):
         # अगर रोबोट पहले से वेल्डिंग कर रहा है, तो नया पाथ इग्नोर करें
@@ -53,9 +66,32 @@ class WeldMotionPlanner(Node):
         request = GetCartesianPath.Request()
         request.header.frame_id = frame_id
         request.group_name = "ur_manipulator"  
-        request.link_name = "weld_sensor_link" # यह सुनिश्चित करेगा कि सेंसर की टिप क्रैक पर चले
+        
+        # -------------------------------------------------------------
+        # ✅ FIX 1: ACTUAL TOOL TIP (Torch) KO TARGET BANAO
+        # Yahan 'weld_sensor_link' ki jagah apni torch ka link daalein
+        # Default UR series mein ye 'tool0' hota hai. 
+        # -------------------------------------------------------------
+        request.link_name = "tool0" 
+
+        # -------------------------------------------------------------
+        # ✅ FIX 2: ROBOT KO BATANA KI WOH ABHI KAHAN KHADA HAI
+        # Iske bina MoveIt hawa se rasta banana shuru kar deta hai
+        # -------------------------------------------------------------
+        if self.current_joint_state is not None:
+            request.start_state.joint_state = self.current_joint_state
+            request.start_state.is_diff = False
+        else:
+            self.get_logger().warn('No current joint state available, using differential start state')
+            request.start_state.is_diff = True 
+
+        # -------------------------------------------------------------
+        # ✅ FIX 3: ROBOT KO AJEEB JATKE (ELBOW FLIP) LENE SE ROKNA
+        # -------------------------------------------------------------
+        request.jump_threshold = 1.5 
+        
         request.waypoints = waypoints
-        request.max_step = 0.01  # हर 1cm पर एक पॉइंट कैलकुलेट करें (High Precision)
+        request.max_step = 0.01  # 1cm precision
         request.avoid_collisions = True
 
         future = self.cartesian_client.call_async(request)

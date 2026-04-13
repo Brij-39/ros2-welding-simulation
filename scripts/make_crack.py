@@ -32,14 +32,23 @@ for i in range(rows):
     local_width = 0.4 + np.abs(np.random.normal(0, 0.3)) 
     max_depth = 2.0
     
-    for j in range(cols):
-        dist = abs(Y[i, j] - center_y)
-        if dist < local_width:
-            depth_ratio = 1.0 - (dist / local_width)
-            local_depth = max_depth * depth_ratio
-            local_depth += np.random.normal(0, 0.1)
-            Z_top[i, j] = -abs(local_depth)
+    # 1. Ek hi baar mein poore row ka distance check karna
+    dist = np.abs(Y[i, :] - center_y)
+    mask = dist < local_width  # Jo points crack ke andar hain, unko mark karna
+    
+    # 2. Sirf un marked points par crack banana
+    if np.any(mask):
+        depth_ratio = 1.0 - (dist[mask] / local_width)
+        noise = np.random.normal(0, 0.1, size=np.sum(mask))
+        local_depth = (max_depth * depth_ratio) + noise
+        
+        Z_top[i, mask] = -np.abs(local_depth)
+import matplotlib.pyplot as plt
 
+plt.imshow(Z_top.T, cmap='terrain', origin='lower')
+plt.colorbar(label='Depth')
+plt.title("Workpiece Fracture Heatmap")
+plt.show()
 Z_bottom = -thickness * np.ones_like(X)
 
 # --- CREATE 3D SOLID BLOCK (WITH CORRECT NORMALS) ---
