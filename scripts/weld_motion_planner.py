@@ -65,14 +65,14 @@ class WeldMotionPlanner(Node):
         # Cartesian Path रिक्वेस्ट तैयार करना
         request = GetCartesianPath.Request()
         request.header.frame_id = frame_id
-        request.group_name = "ur_manipulator"  
+        request.group_name = "welding_arm"  # MoveIt में आपका रोबोटिक आर्म ग्रुप का नाम    
         
         # -------------------------------------------------------------
         # ✅ FIX 1: ACTUAL TOOL TIP (Torch) KO TARGET BANAO
         # Yahan 'weld_sensor_link' ki jagah apni torch ka link daalein
         # Default UR series mein ye 'tool0' hota hai. 
         # -------------------------------------------------------------
-        request.link_name = "tool0" 
+        request.link_name = "weld_tcp" 
 
         # -------------------------------------------------------------
         # ✅ FIX 2: ROBOT KO BATANA KI WOH ABHI KAHAN KHADA HAI

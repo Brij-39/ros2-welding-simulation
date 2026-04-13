@@ -8,14 +8,19 @@
 
   <xacro:ur_srdf name="$(arg name)" prefix="$(arg prefix)"/>
 
+  <group name="welding_arm">
+    <chain base_link="base_link" tip_link="weld_tcp" />
+  </group>
+
   <group name="hand">
     <link name="tool0"/>
     <link name="weld_torch_base"/>
     <link name="weld_torch_tip"/>
+    <link name="weld_tcp"/> 
   </group>
 
   <group name="end_effector">
-    <link name="weld_torch_tip"/>
+    <link name="weld_tcp"/> 
   </group>
 
   <disable_collisions link1="tool0" link2="weld_torch_base" reason="Adjacent"/>
