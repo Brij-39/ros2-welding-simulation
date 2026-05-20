@@ -2,6 +2,9 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="weld_robot">
 
   <xacro:arg name="ur_type" default="ur5e" />
+  
+  <xacro:arg name="transmission_hw_interface" default="hardware_interface/PositionJointInterface" />
+
   <xacro:include filename="$(find ur_description)/urdf/ur.urdf.xacro" />
 
   <xacro:include filename="$(find weld_desc)/urdf/weld_torch.xacro" />

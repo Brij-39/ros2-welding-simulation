@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
@@ -8,14 +7,11 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from geometry_msgs.msg import PoseArray, Pose, PoseStamped
 import numpy as np
 import open3d as o3d
-
-# --- TF2 Imports ---
 import tf2_ros
 import tf2_geometry_msgs 
-
-# --- Math aur Smoothing Imports ---
 from scipy.spatial.transform import Rotation as R_sci
-import scipy.interpolate as si
+from sklearn.cluster import DBSCAN
+from scipy.signal import savgol_filter
 
 class AutoWeldMaster(Node):
     def __init__(self):
@@ -25,7 +21,6 @@ class AutoWeldMaster(Node):
         self.sensor_sub = self.create_subscription(PointCloud2, '/weld_sensor/laser_profiler/points', self.sensor_callback, 10)
         self.path_pub = self.create_publisher(PoseArray, '/weld_path', 10)
 
-        # TF2 Buffer aur Listener Setup
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -34,10 +29,14 @@ class AutoWeldMaster(Node):
         
         self.position_sent = False
         self.path_published = False
-
+        self.scan_ready = False 
+        self.standoff_distance = 0.015
     def go_to_scan_position(self):
         if self.position_sent:
             return
+            
+        self.timer.cancel()
+        
         msg = JointTrajectory()
         msg.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
         point = JointTrajectoryPoint()
@@ -46,24 +45,28 @@ class AutoWeldMaster(Node):
         msg.points.append(point)
         self.traj_pub.publish(msg)
         self.position_sent = True
-        self.get_logger().info('Moving to SAFE Scanning Position... Please wait.')
-        self.timer.cancel()
+        self.get_logger().info('Moving to Scan Position... Waiting 5 seconds to stabilize.')
+        self.timer = self.create_timer(5.0, self.enable_scanning)
+
+    def enable_scanning(self):
+        self.scan_ready = True
+        self.get_logger().info('Robot stabilized! Camera is now capturing.')
+        if hasattr(self, 'timer'):
+            self.timer.cancel()
 
     def sensor_callback(self, msg):
-        if not self.position_sent or self.path_published:
+        if not self.scan_ready or self.path_published:
             return
 
-        # Base Link ka Transform Lookup
         try:
             transform_stamped = self.tf_buffer.lookup_transform(
                 'base_link',             
-                'weld_sensor_link',      
+                msg.header.frame_id,      
                 rclpy.time.Time(),       
                 timeout=rclpy.duration.Duration(seconds=1.0)
             )
         except tf2_ros.TransformException as ex:
-            self.get_logger().warn(f'TF2 Transform abhi available nahi hai: {ex}')
-            return 
+            return
 
         # Point Cloud Processing 
         gen = pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True)
@@ -71,7 +74,8 @@ class AutoWeldMaster(Node):
         if len(points_list) < 100: return 
         points = np.array(points_list, dtype=np.float32)
 
-        mask = points[:, 2] < 0.3
+        # ✅ बाद में:
+        mask = (points[:, 2] < 0.38) & (points[:, 2] > 0.11)
         filtered_points = points[mask]
         if len(filtered_points) < 50: return
 
@@ -91,7 +95,7 @@ class AutoWeldMaster(Node):
         
         pcd_normals = np.asarray(clean_pcd.normals)
         dot_products = np.abs(np.dot(pcd_normals, plane_normal))
-        angle_threshold = np.cos(np.deg2rad(15)) 
+        angle_threshold = np.cos(np.deg2rad(30)) 
         
         ngdt_inliers = [idx for idx in base_inliers if dot_products[idx] > angle_threshold]
         outlier_cloud = clean_pcd.select_by_index(ngdt_inliers, invert=True)
@@ -103,39 +107,61 @@ class AutoWeldMaster(Node):
         denominator = np.sqrt(a**2 + b**2 + c**2)
         distances = numerator / denominator
 
-        deep_crack_mask = distances > 0.005
+        deep_crack_mask = distances > 0.0025
         real_crack_points = outlier_points[deep_crack_mask]
 
         if len(real_crack_points) < 10: 
             return
 
-        centroid = np.mean(real_crack_points, axis=0)
-        dists_to_centroid = np.linalg.norm(real_crack_points - centroid, axis=1)
-        start_idx = np.argmax(dists_to_centroid)
-        
-        current_point = real_crack_points[start_idx]
-        unvisited = np.delete(real_crack_points, start_idx, axis=0)
-        ordered_path = [current_point]
-        
-        while len(unvisited) > 0:
-            dists = np.linalg.norm(unvisited - current_point, axis=1)
-            nearest_idx = np.argmin(dists)
-            current_point = unvisited[nearest_idx]
-            ordered_path.append(current_point)
-            unvisited = np.delete(unvisited, nearest_idx, axis=0)
-            
-        ordered_path = np.array(ordered_path)
-        num_waypoints = min(15, len(ordered_path)) 
+        db = DBSCAN(eps=0.008, min_samples=5).fit(real_crack_points)
+        labels = db.labels_
 
-        # B-Spline Path Smoothing 
-        if len(ordered_path) > 3:
-            tck, u = si.splprep([ordered_path[:, 0], ordered_path[:, 1], ordered_path[:, 2]], s=0.001)
-            u_new = np.linspace(0, 1, num_waypoints)
-            smooth_x, smooth_y, smooth_z = si.splev(u_new, tck)
-            waypoints = np.vstack((smooth_x, smooth_y, smooth_z)).T
-        else:
-            indices = np.linspace(0, len(ordered_path) - 1, num_waypoints, dtype=int)
-            waypoints = ordered_path[indices]
+        if len(set(labels)) > 1:  # एक से ज्यादा clusters हैं
+            # सबसे बड़ा cluster ढूंढो
+            unique_labels, counts = np.unique(labels[labels >= 0], return_counts=True)
+            largest_label = unique_labels[np.argmax(counts)]
+            real_crack_points = real_crack_points[labels == largest_label]
+            self.get_logger().info(f"DBSCAN: {len(set(labels))-1} clusters मिले — सबसे बड़ा रखा")
+
+        if len(real_crack_points) < 10:
+            return
+        
+        # Voxel Downsample — points कम करो पर shape रखो
+        temp_pcd = o3d.geometry.PointCloud()
+        temp_pcd.points = o3d.utility.Vector3dVector(real_crack_points)
+        down_pcd = temp_pcd.voxel_down_sample(voxel_size=0.002)
+        real_crack_points = np.asarray(down_pcd.points)
+
+        # PCA — सिर्फ sorting के लिए, shape के लिए नहीं
+        centroid = np.mean(real_crack_points, axis=0)
+        centered = real_crack_points - centroid
+        cov_matrix = np.cov(centered.T)
+        eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+        main_axis = eigenvectors[:, np.argmax(eigenvalues)]
+
+        # Main axis पर project करके sort करो
+        projections = np.dot(real_crack_points - centroid, main_axis)
+        sorted_indices = np.argsort(projections)
+
+        # Real 3D points use करो — shape maintain होगी
+        ordered_path = real_crack_points[sorted_indices]
+        self.get_logger().info(f"PCA sort done ✅ — {len(ordered_path)} points")
+
+        num_waypoints = min(40, len(ordered_path)) 
+
+        
+
+        indices = np.linspace(0, len(ordered_path) - 1, num_waypoints, dtype=int)
+        waypoints = ordered_path[indices]
+
+        # Savitzky-Golay smoothing — shape maintain करेगा
+        window = min(7, num_waypoints if num_waypoints % 2 != 0 else num_waypoints - 1)
+        waypoints[:, 0] = savgol_filter(waypoints[:, 0], window, 3)
+        waypoints[:, 1] = savgol_filter(waypoints[:, 1], window, 3)
+
+        # Surface पर project करो
+        proj_z = -(a * waypoints[:, 0] + b * waypoints[:, 1] + d) / c
+        waypoints[:, 2] = proj_z
 
         # Debug Visualization
         surface_pcd = clean_pcd.select_by_index(base_inliers)
@@ -152,65 +178,52 @@ class AutoWeldMaster(Node):
         line_set.points = o3d.utility.Vector3dVector(waypoints)
         line_set.lines = o3d.utility.Vector2iVector(lines)
         line_set.colors = o3d.utility.Vector3dVector(colors)
-        
+        waypoint_pcd = o3d.geometry.PointCloud()
+        waypoint_pcd.points = o3d.utility.Vector3dVector(waypoints)
+        waypoint_pcd.paint_uniform_color([0.0, 1.0, 0.0])
         self.get_logger().info("Opening Open3D Plot... Close the window to continue ROS node.")
-        o3d.visualization.draw_geometries([surface_pcd, crack_pcd, line_set], 
-                                          window_name="Crack Detection Debug",
-                                          width=800, height=600)
+        o3d.visualization.draw_geometries([surface_pcd, crack_pcd, line_set, waypoint_pcd], 
+                                  window_name="Crack Detection Debug",
+                                  width=800, height=600)
         
-        # Waypoints ko 'base_link' mein transform karna with ORIENTATION aur STANDOFF
+        # 6. Orientation & Transform Setup
         pose_array = PoseArray()
         pose_array.header.frame_id = "base_link" 
         pose_array.header.stamp = self.get_clock().now().to_msg()
-        
-        for i, wp in enumerate(waypoints):
-            # 1. Travel Direction (X-Axis)
-            if i < len(waypoints) - 1:
-                dir_vec = waypoints[i+1] - wp
-            else:
-                dir_vec = wp - waypoints[i-1] if len(waypoints) > 1 else np.array([1.0, 0.0, 0.0])
-                
-            dir_vec = dir_vec / (np.linalg.norm(dir_vec) + 1e-6)
+        z_vec_tool = -plane_normal
+        z_vec_tool = z_vec_tool / np.linalg.norm(z_vec_tool)
 
-            # 2. Surface Normal (Z-Axis)
-            z_vec = plane_normal
-            z_vec = z_vec / np.linalg.norm(z_vec)
+        # Fixed orientation — scan position की
+        safe_quat = np.array([0.825, -0.564, 0.015, 0.040])
 
-            # 3. Y-Axis = Z cross X
-            y_vec = np.cross(z_vec, dir_vec)
-            if np.linalg.norm(y_vec) < 1e-6:
-                y_vec = np.array([0.0, 1.0, 0.0])
-            y_vec = y_vec / np.linalg.norm(y_vec)
-
-            # 4. Strictly orthogonal X-Axis = Y cross Z
-            x_vec = np.cross(y_vec, z_vec)
-            x_vec = x_vec / np.linalg.norm(x_vec)
-
-            # 5. Rotation Matrix to Quaternion convert karein
-            rot_mat = np.column_stack((x_vec, y_vec, z_vec))
-            r = R_sci.from_matrix(rot_mat)
-            quat = r.as_quat() # Format: [x, y, z, w]
-
-            # 6. STANDOFF DISTANCE (Along Z Normal Vector)
-            standoff_distance = 0.05  # 50mm Standoff
-            wp_with_standoff = wp + (z_vec * standoff_distance)
-
+        for wp in waypoints:
             sensor_pose = PoseStamped()
-            sensor_pose.pose.position.x = float(wp_with_standoff[0])
-            sensor_pose.pose.position.y = float(wp_with_standoff[1])
-            sensor_pose.pose.position.z = float(wp_with_standoff[2])
+            sensor_pose.header.frame_id = msg.header.frame_id
+    
+            sensor_pose.pose.position.x = float(wp[0])
+            sensor_pose.pose.position.y = float(wp[1])
+            sensor_pose.pose.position.z = float(wp[2])
 
-            sensor_pose.pose.orientation.x = float(quat[0])
-            sensor_pose.pose.orientation.y = float(quat[1])
-            sensor_pose.pose.orientation.z = float(quat[2])
-            sensor_pose.pose.orientation.w = float(quat[3])
-            
-            # TF2 convert to Base frame
-            base_pose = tf2_geometry_msgs.do_transform_pose(sensor_pose.pose, transform_stamped)
+            sensor_pose.pose.orientation.x = float(safe_quat[0])
+            sensor_pose.pose.orientation.y = float(safe_quat[1])
+            sensor_pose.pose.orientation.z = float(safe_quat[2])
+            sensor_pose.pose.orientation.w = float(safe_quat[3])
+    
+            # Transform to base_link
+            base_pose = tf2_geometry_msgs.do_transform_pose(
+                sensor_pose.pose, transform_stamped)
+    
+            # Transform के बाद standoff add करो
+            base_pose.position.z += self.standoff_distance
+    
             pose_array.poses.append(base_pose)
         
+        # Array ka frame strictly base_link hona chahiye
+        pose_array.header.frame_id = "base_link"
+        
         self.path_pub.publish(pose_array)
-        self.path_published = True 
+        self.path_published = True
+        self.destroy_subscription(self.sensor_sub)
         
         self.get_logger().info(f"🔴 [SUCCESS] Published {num_waypoints} waypoints with 3D STANDOFF & ORIENTATION -> COMMAND: LASER ON")
 
