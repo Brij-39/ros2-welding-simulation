@@ -3,7 +3,7 @@
 AutoWeldMaster - ROS2 Node for Autonomous Weld Crack Detection and Path Planning
 Workflow:
   1. Move robot arm to a predefined scanning position
-  2. Capture a LiDAR/laser point cloud of the target surface
+  2. Capture a laser point cloud of the target surface
   3. Detect cracks using plane segmentation + normal filtering + DBSCAN clustering
   4. Generate a smooth 40-point welding path along the crack
   5. Transform waypoints to base_link frame and publish as PoseArray
